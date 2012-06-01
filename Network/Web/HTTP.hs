@@ -12,7 +12,7 @@ module Network.Web.HTTP (receive, respond,
                          Comm, Fields,
                          lookupField, lookupField',
                          insertField, insertField',
-                         receiveFields,
+                         receiveFields, fromFields,
                          module Network.Web.Params) where
 
 import Control.Applicative
