@@ -1,7 +1,7 @@
 Name:                   webserver
-Version:                0.4.5
+Version:                0.4.6
 Author:                 Kazu Yamamoto <kazu@iij.ad.jp>
-Maintainer:             Kazu Yamamoto <kazu@iij.ad.jp>
+Maintainer:             John W. Lato <jwlato@gmail.com>
 License:                BSD3
 License-File:           LICENSE
 Synopsis:               HTTP server library
