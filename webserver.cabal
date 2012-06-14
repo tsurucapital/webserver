@@ -5,7 +5,7 @@ Maintainer:             John W. Lato <jwlato@gmail.com>
 License:                BSD3
 License-File:           LICENSE
 Synopsis:               HTTP server library
-Description:            A simple but practical library of HTTP server
+Description:            A simple but practical HTTP server library.
 Category:               Network
 Cabal-Version:          >= 1.6
 Build-Type:             Simple
