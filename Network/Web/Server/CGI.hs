@@ -2,7 +2,10 @@
 
 module Network.Web.Server.CGI (tryGetCGI) where
 
+import Prelude hiding (catch)
+
 import Control.Applicative
+import Control.Exception
 import qualified Data.ByteString.Char8      as S
 import qualified Data.ByteString.Lazy.Char8 as L
 import Data.Maybe
@@ -20,8 +23,10 @@ gatewayInterface = "CGI/1.1"
 ----------------------------------------------------------------
 
 tryGetCGI :: BasicConfig -> Request -> CGI -> IO (Maybe Response)
-tryGetCGI cnf req cgi = processCGI `catch` const internalError
+tryGetCGI cnf req cgi = either e2Nothing id <$> try processCGI
   where
+    e2Nothing :: SomeException -> Maybe Response
+    e2Nothing = const Nothing
     processCGI = do
       let envVars = makeEnv cnf req cgi
           pro = CreateProcess {
