@@ -147,6 +147,7 @@ data FieldKey = FkAcceptLanguage
               | FkCacheControl
               | FkConnection
               | FkContentLength
+              | FkContentRange
               | FkContentType
               | FkCookie
               | FkDate
@@ -169,6 +170,7 @@ fieldKeyList = [ FkAcceptLanguage
                , FkCacheControl
                , FkConnection
                , FkContentLength
+               , FkContentRange
                , FkContentType
                , FkCookie
                , FkDate
@@ -189,6 +191,7 @@ fieldStringList = [ "Accept-Language"
                   , "Cache-Control"
                   , "Connection"
                   , "Content-Length"
+                  , "Content-Range"
                   , "Content-Type"
                   , "Cookie"
                   , "Date"
