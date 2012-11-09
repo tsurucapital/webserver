@@ -29,6 +29,8 @@ import Network.Web.Server.Range
 import Network.Web.URI
 import System.FilePath
 
+import Text.Printf
+
 ----------------------------------------------------------------
 
 {-|
@@ -165,7 +167,8 @@ tryGetFile' cnf req file lang = do
           return . Just $ response OK val size ct modified
         Just st@(PartialContent skip len) -> do
           val <- obtain cnf file' $ Just (skip,len)
-          return . Just $ response st val len ct modified
+          let rangeSpec = S.pack $ printf "bytes %d-%d/*" skip (skip+len-1)
+          return . Just $ insertField FkContentRange rangeSpec $ response st val len ct modified
         Just st ->
           return . Just $ response st L.empty 0 ct modified
         _       -> return Nothing -- never reached
