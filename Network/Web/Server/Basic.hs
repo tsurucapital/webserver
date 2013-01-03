@@ -188,24 +188,6 @@ languages req = maybe [] (parseLang . S.unpack) $ lookupField FkAcceptLanguage r
 
 ----------------------------------------------------------------
 
-(>>|) :: Maybe a -> (a -> IO (Maybe b)) -> IO (Maybe b)
-v >>| act =
-    case v of
-      Nothing -> return Nothing
-      Just x  -> act x
-
-(|>|) :: IO (Maybe a) -> (a -> IO (Maybe b)) -> IO (Maybe b)
-a |>| act = do
-    v <- a
-    case v of
-      Nothing -> return Nothing
-      Just x  -> act x
-
-(|||) :: Maybe Status -> Maybe Status -> Maybe Status
-(|||) = mplus
-
-----------------------------------------------------------------
-
 ifModifiedSince :: Request -> Maybe UTCTime
 ifModifiedSince = lookupAndParseDate FkIfModifiedSince
 
@@ -232,16 +214,19 @@ tryGetFile cnf req file langs
   | otherwise                 = tryGetFile' cnf req file ""
 
 tryGetFile' :: BasicConfig -> Request -> FilePath -> String -> IO (Maybe Response)
-tryGetFile' cnf req file lang = do
-    let file' = file ++ lang
-    info cnf file' |>| \(size, mtime) -> do
+tryGetFile' cnf req file lang = info cnf file' >>= maybe (return Nothing) get
+  where
+    file' = file ++ lang
+    get (size, mtime) = do
       let ext = takeExtension file
           ct = selectContentType ext
           modified = utcToDate mtime
-          mst = ifmodified req size mtime
-            ||| ifunmodified req size mtime
-            ||| ifrange req size mtime
-            ||| unconditional req size mtime
+          mst = msum
+            [ ifmodified req size mtime
+            , ifunmodified req size mtime
+            , ifrange req size mtime
+            , unconditional req size mtime
+            ]
       case mst of
         Just OK -> do
           val <- obtain cnf file' Nothing
@@ -320,8 +305,9 @@ redirectURI uri =
       else Just uri { uriPath = path `S.append` "/" }
 
 tryRedirect :: BasicConfig -> URI -> [String] -> IO (Maybe Response)
-tryRedirect cnf uri langs =
-    redirectURI uri >>| \ruri -> tryRedirect' (mapper cnf ruri) ruri
+tryRedirect cnf uri langs = maybe (return Nothing)
+    (\ruri -> tryRedirect' (mapper cnf ruri) ruri)
+    (redirectURI uri)
   where
     tryRedirect' None           _ = return Nothing
     tryRedirect' (PathCGI _)    _ = return Nothing
