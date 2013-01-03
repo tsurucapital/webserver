@@ -29,6 +29,8 @@ import Network.Web.Server.Params
 import Network.Web.Server.Range
 import Network.Web.URI
 import System.FilePath
+import System.IO (openFile, IOMode(..), BufferMode(..), hPutStrLn, hSetBuffering, hClose)
+import System.Directory (createDirectoryIfMissing)
 
 import Text.Printf
 
@@ -145,6 +147,7 @@ tryGet cnf req uri langs = tryGet' $ mapper cnf uri
     tryGet' None          = return Nothing
     tryGet' (File file)   = tryGetFile cnf req file langs
     tryGet' (PathCGI cgi) = tryGetCGI  cnf req cgi
+    tryGet' (Handler hlr) = Just <$> hlr (Just req)
 
 tryGetFile :: BasicConfig -> Request -> FilePath -> [String] -> IO (Maybe Response)
 tryGetFile cnf req file langs
@@ -212,6 +215,7 @@ tryHead cnf uri langs = tryHead' (mapper cnf uri)
   where
     tryHead' None        = return Nothing
     tryHead' (PathCGI _) = return Nothing
+    tryHead' (Handler _) = return Nothing
     tryHead' (File file) = tryHeadFile cnf file langs
 
 tryHeadFile :: BasicConfig -> FilePath -> [String] -> IO (Maybe Response)
@@ -244,6 +248,7 @@ tryRedirect cnf uri langs =
   where
     tryRedirect' None           _ = return Nothing
     tryRedirect' (PathCGI _)    _ = return Nothing
+    tryRedirect' (Handler _)    _ = return Nothing
     tryRedirect' (File file) ruri = runAnyMaybeIO $ map (tryRedirectFile cnf ruri file) langs
 
 tryRedirectFile :: BasicConfig -> URI -> FilePath -> String -> IO (Maybe Response)

@@ -1,11 +1,17 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 {-# OPTIONS -Wall #-}
 module Network.Web.Server.Params where
 
+import Control.Applicative ((<$>))
 import qualified Data.ByteString.Char8      as S
 import qualified Data.ByteString.Lazy.Char8 as L
 import Data.Time
+import Data.Time.Clock.POSIX
 import Network.TCPInfo
+import Network.Web.Server
 import Network.Web.URI
+import System.Posix.Files
 
 {-|
   The configuration for the basic web server.
@@ -26,6 +32,19 @@ data BasicConfig = BasicConfig {
 }
 
 {-|
+  Default 'BasicConfig', with 'obtain', 'info', and 'serverName' filled in.
+  It is necessary to override the 'mapper' and 'tcpInfo' fields
+-}
+defaultConfig :: BasicConfig
+defaultConfig = BasicConfig
+  { mapper = error "BasicConfig: no mapper defined"
+  , obtain = defaultObtain
+  , info   = defaultInfo
+  , serverName = "BasicConfig: no server name"
+  , tcpInfo    = error "BasicConfig: no TCPInfo"
+  }
+
+{-|
   Control information of how to handle 'URI'.
 -}
 data Path =
@@ -35,7 +54,20 @@ data Path =
   | File FilePath
     -- | 'URI' is converted into CGI.
   | PathCGI CGI
-  deriving (Eq,Show)
+    -- | 'URI' is converted into a handler callback
+  | Handler WebServer -- (Maybe Request -> IO Response)
+
+instance Eq Path where
+    (File fp1) == (File fp2) = fp1 == fp2
+    (PathCGI cgi1) == (PathCGI cgi2) = cgi1 == cgi2
+    None == None = True
+    _ == _ = False
+
+instance Show Path where
+    show None = "None"
+    show (File fp) = "File " ++ show fp
+    show (PathCGI cgi) = "PathCGI (" ++ show cgi ++ ")"
+    show (Handler _)   = "Handler"
 
 {-|
   Internal information of CGI converted from 'URI'.
@@ -50,3 +82,23 @@ data CGI = CGI {
     -- | A query string.
   , queryString :: String
   } deriving (Eq,Show)
+
+-- | Get the size and modification time of a file, if possible.
+defaultInfo :: FilePath -> IO (Maybe (Integer, UTCTime))
+defaultInfo fp = do
+    exists <- fileExist fp
+    if exists
+        then do
+            status <- getFileStatus fp
+            let size = fromIntegral $ fileSize status
+                mt   = posixSecondsToUTCTime . realToFrac $ modificationTime status
+            return $ Just (size,mt)
+        else return Nothing
+
+-- | Obtain a data slice from a file as a lazy bytestring.
+defaultObtain :: FilePath -> Maybe (Integer,Integer) -> IO L.ByteString
+defaultObtain fp Nothing = L.readFile fp
+defaultObtain fp (Just (offset,numBytes)) = L.take nb . L.drop ofs <$> L.readFile fp
+  where
+    nb  = fromIntegral numBytes
+    ofs = fromIntegral offset
