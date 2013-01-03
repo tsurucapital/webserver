@@ -8,6 +8,7 @@
   CGI, chunked data for CGI output;
 -}
 
+{-# OPTIONS -Wall #-}
 module Network.Web.Server.Basic (basicServer,
                                  module Network.Web.Server.Params) where
 

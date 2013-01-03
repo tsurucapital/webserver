@@ -1,6 +1,7 @@
 {-|
   HTTP server library.
 -}
+{-# OPTIONS -Wall #-}
 module Network.Web.Server (connection, WebServer, WebConfig(..)) where
 
 import Control.Applicative

@@ -1,3 +1,4 @@
+{-# OPTIONS -Wall #-}
 module Network.Web.Server.Params where
 
 import qualified Data.ByteString.Char8      as S
