@@ -9,16 +9,23 @@
 -}
 
 {-# OPTIONS -Wall #-}
-module Network.Web.Server.Basic (basicServer,
+module Network.Web.Server.Basic (serveHTTP,
+                                 basicServer,
                                  module Network.Web.Server.Params) where
 
 import Control.Applicative
+import Control.Concurrent (forkIO)
+import Control.Concurrent.MVar
+import Control.Concurrent.STM (atomically)
+import Control.Concurrent.STM.TChan
+import Control.Exception (bracket)
 import Control.Monad
 import qualified Data.ByteString.Char8      as S
 import qualified Data.ByteString.Lazy.Char8 as L
 import Data.List
 import Data.Maybe
 import Data.Time
+import Network (withSocketsDo, PortID(..), sClose, listenOn)
 import Network.TCPInfo
 import Network.Web.Date
 import Network.Web.HTTP
@@ -33,6 +40,76 @@ import System.IO (openFile, IOMode(..), BufferMode(..), hPutStrLn, hSetBuffering
 import System.Directory (createDirectoryIfMissing)
 
 import Text.Printf
+
+
+----------------------------------------------------------------
+
+{-|
+  Run an HTTP server, using a default BasicConfig.
+-}
+serveHTTP :: FilePath       -- ^ Directory to write logfiles, "access.log" and "error.log".  Will be created if it doesn't exist.
+          -> Int            -- ^ HTTP port
+          -> S.ByteString   -- ^ Server name
+          -> (URI -> Path)  -- ^ site mapping function
+          -> IO ()
+serveHTTP logPath httpPort servName sitemap = do
+    createDirectoryIfMissing True logPath
+    acclogchan <- newTChanIO
+    accsync    <- newEmptyMVar
+    errlogchan <- newTChanIO
+    errsync    <- newEmptyMVar
+    let errlog  = logPath </> "error.log"
+        acclog  = logPath </> "access.log"
+        logwait = do
+            atomically $ writeTChan acclogchan Nothing
+            atomically $ writeTChan errlogchan Nothing
+            mapM_ takeMVar [accsync, errsync]
+        doAcc   = atomically . writeTChan acclogchan . Just
+        doErr   = atomically . writeTChan errlogchan . Just
+
+    _ <- forkIO $ logger acclog acclogchan accsync
+    _ <- forkIO $ logger errlog errlogchan errsync
+
+    let cfg = WebConfig {
+              closedHook = const $ return ()
+            , accessHook = doAcc
+            , errorHook  = doErr
+            , fatalErrorHook = doErr
+            , connectionTimer = 2
+            }
+        topHandler tcpi = basicServer $ defaultConfig {
+              serverName = servName
+            , tcpInfo = tcpi
+            , mapper = sitemap
+            }
+        runserver = withSocketsDo $ do
+            sock <- listenOn (PortNumber $ fromIntegral httpPort)
+            void $ mainLoop sock
+            sClose sock
+        mainLoop sock = do
+            conn <- accept sock
+            void $ forkIO (runConn conn)
+            mainLoop sock
+        runConn (hndl,tcpi) = do
+            connection hndl (topHandler tcpi) cfg
+    runserver
+    logwait
+
+logger :: FilePath -> TChan (Maybe String) -> MVar () -> IO ()
+logger path chan sync = bracket opener closer go
+  where
+    opener = do
+        h <- openFile path AppendMode
+        hSetBuffering h LineBuffering
+        return h
+    closer h = do
+        hClose h
+        putMVar sync ()
+    go h = do
+        val <- atomically $ readTChan chan
+        case val of
+            Just msg -> hPutStrLn h msg >> go h
+            Nothing  -> hClose h >> putMVar sync ()
 
 ----------------------------------------------------------------
 
