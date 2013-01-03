@@ -41,7 +41,7 @@ data Path =
   Internal information of CGI converted from 'URI'.
 -}
 data CGI = CGI {
-    -- | A porgram path to be executed.
+    -- | A program path to be executed.
     progPath    :: FilePath
     -- | A script name.
   , scriptName  :: String
