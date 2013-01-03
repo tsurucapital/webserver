@@ -165,47 +165,28 @@ data FieldKey = FkAcceptLanguage
               | FkOther S.ByteString
               deriving (Eq,Show,Ord)
 
-fieldKeyList :: [FieldKey]
-fieldKeyList = [ FkAcceptLanguage
-               , FkCacheControl
-               , FkConnection
-               , FkContentLength
-               , FkContentRange
-               , FkContentType
-               , FkCookie
-               , FkDate
-               , FkHost
-               , FkIfModifiedSince
-               , FkIfRange
-               , FkIfUnmodifiedSince
-               , FkLastModified
-               , FkLocation
-               , FkRange
-               , FkServer
-               , FkSetCookie2
-               , FkStatus
-               , FkTransferEncoding ]
-
-fieldStringList :: [S.ByteString]
-fieldStringList = [ "Accept-Language"
-                  , "Cache-Control"
-                  , "Connection"
-                  , "Content-Length"
-                  , "Content-Range"
-                  , "Content-Type"
-                  , "Cookie"
-                  , "Date"
-                  , "Host"
-                  , "If-Modified-Since"
-                  , "If-Range"
-                  , "If-Unmodified-Since"
-                  , "Last-Modified"
-                  , "Location"
-                  , "Range"
-                  , "Server"
-                  , "Set-Cookie2"
-                  , "Status"
-                  , "Transfer-Encoding" ]
+fieldKeyStringList :: [(FieldKey, S.ByteString)]
+fieldKeyStringList =
+    [ (FkAcceptLanguage    , "Accept-Language")
+    , (FkCacheControl      , "Cache-Control")
+    , (FkConnection        , "Connection")
+    , (FkContentLength     , "Content-Length")
+    , (FkContentRange      , "Content-Range")
+    , (FkContentType       , "Content-Type")
+    , (FkCookie            , "Cookie")
+    , (FkDate              , "Date")
+    , (FkHost              , "Host")
+    , (FkIfModifiedSince   , "If-Modified-Since")
+    , (FkIfRange           , "If-Range")
+    , (FkIfUnmodifiedSince , "If-Unmodified-Since")
+    , (FkLastModified      , "Last-Modified")
+    , (FkLocation          , "Location")
+    , (FkRange             , "Range")
+    , (FkServer            , "Server")
+    , (FkSetCookie2        , "Set-Cookie2")
+    , (FkStatus            , "Status")
+    , (FkTransferEncoding  , "Transfer-Encoding" )
+    ]
 
 {-|
   Field value of HTTP header.
@@ -213,10 +194,12 @@ fieldStringList = [ "Accept-Language"
 type FieldValue = S.ByteString
 
 stringFieldKey :: M.Map FieldValue FieldKey
-stringFieldKey = M.fromList (zip fieldStringList fieldKeyList)
+stringFieldKey = M.fromList (map swap fieldKeyStringList)
+  where
+    swap (a,b) = (b,a)
 
 fieldKeyString :: M.Map FieldKey FieldValue
-fieldKeyString = M.fromList (zip fieldKeyList fieldStringList)
+fieldKeyString = M.fromList fieldKeyStringList
 
 {-|
   Converting field key to 'FieldKey'.
