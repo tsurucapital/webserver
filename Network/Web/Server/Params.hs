@@ -9,6 +9,7 @@ import qualified Data.ByteString.Lazy.Char8 as L
 import Data.Time
 import Data.Time.Clock.POSIX
 import Network.TCPInfo
+import Network.Web.HTTP
 import Network.Web.Server
 import Network.Web.URI
 import System.Posix.Files
@@ -18,7 +19,7 @@ import System.Posix.Files
 -}
 data BasicConfig = BasicConfig {
    -- | A mapper from 'URI' to 'Path'.
-   mapper :: URI -> Path
+   mapper :: Request -> Path
    -- | Resource obtaining function. The second argument is
    --   (offset of the resource, and length from the offset).
  , obtain :: FilePath -> Maybe (Integer,Integer) -> IO L.ByteString
@@ -55,7 +56,7 @@ data Path =
     -- | 'URI' is converted into CGI.
   | PathCGI CGI
     -- | 'URI' is converted into a handler callback
-  | Handler WebServer -- (Maybe Request -> IO Response)
+  | Handler (IO Response)
 
 instance Eq Path where
     (File fp1) == (File fp2) = fp1 == fp2

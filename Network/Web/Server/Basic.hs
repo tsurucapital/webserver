@@ -51,7 +51,7 @@ serveHTTP :: Maybe FilePath -- ^ Directory to write logfiles, "access.log" and "
                             -- if Nothing, errors will be written to stderr
           -> Int            -- ^ HTTP port
           -> S.ByteString   -- ^ Server name
-          -> (URI -> Path)  -- ^ site mapping function
+          -> (Request -> Path)  -- ^ site mapping function
           -> IO ()
 serveHTTP m'logPath httpPort servName sitemap = do
     (accHandler,errHandler,logwait) <- case m'logPath of
@@ -171,18 +171,16 @@ runAnyMaybeIO (a:as) = do
 
 processGET :: BasicConfig -> Request -> IO Response
 processGET cnf req = do
-    let uri = reqURI req
-        langs = map ('.':) (languages req) ++ ["",".en"]
-    runAnyIO [ tryGet cnf req uri langs
-             , tryRedirect cnf uri langs
+    let langs = map ('.':) (languages req) ++ ["",".en"]
+    runAnyIO [ tryGet cnf req langs
+             , tryRedirect cnf req langs
              , notFound ] -- always Just
 
 processHEAD :: BasicConfig -> Request -> IO Response
 processHEAD cnf req = do
-    let uri = reqURI req
-        langs = map ('.':) (languages req) ++ ["",".en"]
-    runAnyIO [ tryHead cnf uri langs
-             , tryRedirect cnf uri langs
+    let langs = map ('.':) (languages req) ++ ["",".en"]
+    runAnyIO [ tryHead cnf req langs
+             , tryRedirect cnf req langs
              , notFound ] -- always Just
 
 processPOST :: BasicConfig -> Request -> IO Response
@@ -205,13 +203,13 @@ ifRange = lookupAndParseDate FkIfRange
 lookupAndParseDate :: FieldKey -> Request -> Maybe UTCTime
 lookupAndParseDate key req = lookupField key req >>= parseDate
 
-tryGet :: BasicConfig -> Request -> URI -> [String] -> IO (Maybe Response)
-tryGet cnf req uri langs = tryGet' $ mapper cnf uri
+tryGet :: BasicConfig -> Request -> [String] -> IO (Maybe Response)
+tryGet cnf req langs = tryGet' $ mapper cnf req
   where
     tryGet' None          = return Nothing
     tryGet' (File file)   = tryGetFile cnf req file langs
     tryGet' (PathCGI cgi) = tryGetCGI  cnf req cgi
-    tryGet' (Handler hlr) = Just <$> hlr (Just req)
+    tryGet' (Handler hlr) = Just <$> hlr
 
 tryGetFile :: BasicConfig -> Request -> FilePath -> [String] -> IO (Maybe Response)
 tryGetFile cnf req file langs
@@ -277,8 +275,8 @@ range size rng = case skipAndSize (S.unpack rng) size of
 
 ----------------------------------------------------------------
 
-tryHead :: BasicConfig -> URI -> [String] -> IO (Maybe Response)
-tryHead cnf uri langs = tryHead' (mapper cnf uri)
+tryHead :: BasicConfig -> Request -> [String] -> IO (Maybe Response)
+tryHead cnf req langs = tryHead' (mapper cnf req)
   where
     tryHead' None        = return Nothing
     tryHead' (PathCGI _) = return Nothing
@@ -309,11 +307,13 @@ redirectURI uri =
       then Nothing
       else Just uri { uriPath = path `S.append` "/" }
 
-tryRedirect :: BasicConfig -> URI -> [String] -> IO (Maybe Response)
-tryRedirect cnf uri langs = maybe (return Nothing)
-    (\ruri -> tryRedirect' (mapper cnf ruri) ruri)
+tryRedirect :: BasicConfig -> Request -> [String] -> IO (Maybe Response)
+tryRedirect cnf req langs = maybe (return Nothing)
+    (\ruri -> tryRedirect' (mapper cnf $ rreq ruri) ruri)
     (redirectURI uri)
   where
+    uri = reqURI req
+    rreq ruri = req {reqURI = ruri}
     tryRedirect' None           _ = return Nothing
     tryRedirect' (PathCGI _)    _ = return Nothing
     tryRedirect' (Handler _)    _ = return Nothing
@@ -330,7 +330,7 @@ tryRedirectFile cnf ruri file lang = do
 ----------------------------------------------------------------
 
 tryPost :: BasicConfig -> Request -> IO Response
-tryPost cnf req = case mapper cnf (reqURI req) of
+tryPost cnf req = case mapper cnf req of
     -- never reached to undefined
     PathCGI cgi -> fromMaybe undefined <$> tryGetCGI cnf req cgi
     _           -> return responseBadRequest
