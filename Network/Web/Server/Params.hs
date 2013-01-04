@@ -10,8 +10,6 @@ import Data.Time
 import Data.Time.Clock.POSIX
 import Network.TCPInfo
 import Network.Web.HTTP
-import Network.Web.Server
-import Network.Web.URI
 import System.Posix.Files
 
 {-|
