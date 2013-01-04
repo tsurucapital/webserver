@@ -36,7 +36,7 @@ import Network.Web.Server.Params
 import Network.Web.Server.Range
 import Network.Web.URI
 import System.FilePath
-import System.IO (openFile, IOMode(..), BufferMode(..), hPutStrLn, hSetBuffering, hClose)
+import System.IO (openFile, IOMode(..), BufferMode(..), hPutStrLn, hSetBuffering, hClose, stderr)
 import System.Directory (createDirectoryIfMissing)
 
 import Text.Printf
@@ -47,34 +47,39 @@ import Text.Printf
 {-|
   Run an HTTP server, using a default BasicConfig.
 -}
-serveHTTP :: FilePath       -- ^ Directory to write logfiles, "access.log" and "error.log".  Will be created if it doesn't exist.
+serveHTTP :: Maybe FilePath -- ^ Directory to write logfiles, "access.log" and "error.log".  Will be created if it doesn't exist.
+                            -- if Nothing, errors will be written to stderr
           -> Int            -- ^ HTTP port
           -> S.ByteString   -- ^ Server name
           -> (URI -> Path)  -- ^ site mapping function
           -> IO ()
-serveHTTP logPath httpPort servName sitemap = do
-    createDirectoryIfMissing True logPath
-    acclogchan <- newTChanIO
-    accsync    <- newEmptyMVar
-    errlogchan <- newTChanIO
-    errsync    <- newEmptyMVar
-    let errlog  = logPath </> "error.log"
-        acclog  = logPath </> "access.log"
-        logwait = do
-            atomically $ writeTChan acclogchan Nothing
-            atomically $ writeTChan errlogchan Nothing
-            mapM_ takeMVar [accsync, errsync]
-        doAcc   = atomically . writeTChan acclogchan . Just
-        doErr   = atomically . writeTChan errlogchan . Just
+serveHTTP m'logPath httpPort servName sitemap = do
+    (accHandler,errHandler,logwait) <- case m'logPath of
+        Nothing -> return (const (return ()), hPutStrLn stderr, return ())
+        Just logPath -> do
+            createDirectoryIfMissing True logPath
+            acclogchan <- newTChanIO
+            accsync    <- newEmptyMVar
+            errlogchan <- newTChanIO
+            errsync    <- newEmptyMVar
+            let errlog  = logPath </> "error.log"
+                acclog  = logPath </> "access.log"
+                logwait = do
+                    atomically $ writeTChan acclogchan Nothing
+                    atomically $ writeTChan errlogchan Nothing
+                    mapM_ takeMVar [accsync, errsync]
+                doAcc   = atomically . writeTChan acclogchan . Just
+                doErr   = atomically . writeTChan errlogchan . Just
 
-    _ <- forkIO $ logger acclog acclogchan accsync
-    _ <- forkIO $ logger errlog errlogchan errsync
+            _ <- forkIO $ logger acclog acclogchan accsync
+            _ <- forkIO $ logger errlog errlogchan errsync
+            return (doAcc, doErr, logwait)
 
     let cfg = WebConfig {
               closedHook = const $ return ()
-            , accessHook = doAcc
-            , errorHook  = doErr
-            , fatalErrorHook = doErr
+            , accessHook = accHandler
+            , errorHook  = errHandler
+            , fatalErrorHook = errHandler
             , connectionTimer = 2
             }
         topHandler tcpi = basicServer $ defaultConfig {
