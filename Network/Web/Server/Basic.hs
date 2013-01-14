@@ -331,8 +331,8 @@ tryRedirectFile cnf ruri file lang = do
 
 tryPost :: BasicConfig -> Request -> IO Response
 tryPost cnf req = case mapper cnf req of
-    -- never reached to undefined
     PathCGI cgi -> fromMaybe undefined <$> tryGetCGI cnf req cgi
+    Handler resp-> resp
     _           -> return responseBadRequest
 
 ----------------------------------------------------------------
