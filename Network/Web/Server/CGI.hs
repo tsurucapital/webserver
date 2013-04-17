@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings, CPP #-}
 
+{-# OPTIONS_GHC -fno-warn-dodgy-imports #-}
 module Network.Web.Server.CGI (tryGetCGI) where
 
 import Prelude hiding (catch)

@@ -26,7 +26,7 @@ import Data.Maybe
 import Network.Web.Params
 import Network.Web.URI
 import System.IO
-import System.IO.Error hiding (try)
+import System.IO.Error (isEOFError, ioeGetErrorType)
 import Text.Printf
 
 ----------------------------------------------------------------
