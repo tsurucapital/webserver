@@ -27,7 +27,8 @@ import qualified Data.ByteString.Lazy.Char8 as L
 import Data.List
 import Data.Maybe
 import Data.Time
-import Network (withSocketsDo, PortID(..), sClose, listenOn)
+import Network.Socket hiding (accept)
+import Network.BSD (getProtocolNumber)
 import Network.TCPInfo
 import Network.Web.Date
 import Network.Web.HTTP
@@ -104,9 +105,9 @@ serveHTTPMapIO m'logPath httpPort servName sitemapIO = do
             , mapper = sitemapIO
             }
         runserver = withSocketsDo $ do
-            sock <- listenOn (PortNumber $ fromIntegral httpPort)
+            sock <- listenOn $ show httpPort
             void $ mainLoop sock
-            sClose sock
+            close sock
         mainLoop sock = do
             conn <- accept sock
             void $ forkIO (runConn conn)
@@ -115,6 +116,25 @@ serveHTTPMapIO m'logPath httpPort servName sitemapIO = do
             connection hndl (topHandler tcpi) cfg
     runserver
     logwait
+
+listenOn :: ServiceName -> IO Socket
+listenOn serv = do
+    proto <- getProtocolNumber "tcp"
+    let hints = defaultHints {
+            addrFlags = [ AI_ADDRCONFIG, AI_NUMERICHOST
+                        , AI_NUMERICSERV, AI_PASSIVE
+                        ]
+          , addrSocketType = Stream
+          , addrProtocol = proto
+          }
+    addrs <- getAddrInfo (Just hints) Nothing (Just serv)
+    let addrs' = filter (\x -> addrFamily x == AF_INET6) addrs
+        addr = if null addrs' then head addrs else head addrs'
+    sock <- socket (addrFamily addr) (addrSocketType addr) (addrProtocol addr)
+    setSocketOption sock ReuseAddr 1
+    bind sock (addrAddress addr)
+    listen sock maxListenQueue
+    return sock
 
 logger :: FilePath -> TChan (Maybe String) -> MVar () -> IO ()
 logger path chan sync = bracket opener closer go
